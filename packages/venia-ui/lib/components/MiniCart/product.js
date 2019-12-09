@@ -1,78 +1,82 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { array, func, number, shape, string } from 'prop-types';
+
 import { Price } from '@magento/peregrine';
+import { useProduct } from '@magento/peregrine/lib/talons/MiniCart/useProduct';
+import { transparentPlaceholder } from '@magento/peregrine/lib/util/images';
 
 import { mergeClasses } from '../../classify';
-import { resourceUrl } from '@magento/venia-drivers';
-
 import Image from '../Image';
-import { transparentPlaceholder } from '../../shared/images';
-
 import Kebab from './kebab';
+import defaultClasses from './product.css';
 import ProductOptions from './productOptions';
 import Section from './section';
 
-import defaultClasses from './product.css';
-
-const imageWidth = 80;
-const imageHeight = 100;
+const PRODUCT_IMAGE_WIDTH = 80;
 
 const Product = props => {
     const { beginEditItem, currencyCode, item, removeItemFromCart } = props;
-    const { image, name, options, price, qty } = item;
 
-    const [isFavorite, setIsFavorite] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const talonProps = useProduct({
+        beginEditItem,
+        item,
+        removeItemFromCart
+    });
+
+    const {
+        handleEditItem,
+        handleFavoriteItem,
+        handleRemoveItem,
+        hasImage,
+        isFavorite,
+        isLoading,
+        productName,
+        productOptions,
+        productPrice,
+        productQuantity
+    } = talonProps;
 
     const classes = mergeClasses(defaultClasses, props.classes);
-    const mask = isLoading ? <div className={classes.mask} /> : null;
+    const { image } = item;
 
     const productImage = useMemo(() => {
-        const src =
-            image && image.file
-                ? resourceUrl(image.file, {
-                      type: 'image-product',
-                      width: imageWidth,
-                      height: imageHeight
-                  })
-                : transparentPlaceholder;
+        const imageProps = {
+            alt: productName,
+            classes: { image: classes.image, root: classes.imageContainer },
+            width: PRODUCT_IMAGE_WIDTH
+        };
 
-        return (
-            <Image
-                alt={name}
-                classes={{ root: classes.image }}
-                placeholder={transparentPlaceholder}
-                src={src}
-                fileSrc={image.file}
-                sizes={`${imageWidth}px`}
-            />
-        );
-    }, [image, name, classes.image]);
+        if (!hasImage) {
+            imageProps.src = transparentPlaceholder;
+        } else {
+            imageProps.resource = image.file;
+        }
 
-    const handleFavoriteItem = useCallback(() => {
-        setIsFavorite(!isFavorite);
-    }, [isFavorite]);
-    const handleEditItem = useCallback(() => {
-        beginEditItem(item);
-    }, [beginEditItem, item]);
-    const handleRemoveItem = useCallback(() => {
-        setIsLoading(true);
+        return <Image {...imageProps} />;
+    }, [
+        classes.image,
+        classes.imageContainer,
+        hasImage,
+        image.file,
+        productName
+    ]);
 
-        // TODO: prompt user to confirm this action?
-        removeItemFromCart({ item });
-    }, [item, removeItemFromCart]);
+    const mask = isLoading ? <div className={classes.mask} /> : null;
 
     return (
         <li className={classes.root}>
             {productImage}
-            <div className={classes.name}>{name}</div>
-            <ProductOptions options={options} />
+            <div className={classes.name}>{productName}</div>
+            <ProductOptions options={productOptions} />
             <div className={classes.quantity}>
                 <div className={classes.quantityRow}>
-                    <span>{qty}</span>
+                    <span>{productQuantity}</span>
                     <span className={classes.quantityOperator}>{'×'}</span>
                     <span className={classes.price}>
-                        <Price currencyCode={currencyCode} value={price} />
+                        <Price
+                            currencyCode={currencyCode}
+                            value={productPrice}
+                        />
                     </span>
                 </div>
             </div>

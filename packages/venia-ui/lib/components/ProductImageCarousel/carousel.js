@@ -1,48 +1,53 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { arrayOf, bool, number, shape, string } from 'prop-types';
-import { useCarousel } from '@magento/peregrine';
-import { resourceUrl } from '@magento/venia-drivers';
 import {
     ChevronLeft as ChevronLeftIcon,
     ChevronRight as ChevronRightIcon
 } from 'react-feather';
+
+import { transparentPlaceholder } from '@magento/peregrine/lib/util/images';
+import { useProductImageCarousel } from '@magento/peregrine/lib/talons/ProductImageCarousel/useProductImageCarousel';
+
 import { mergeClasses } from '../../classify';
-import Thumbnail from './thumbnail';
-import defaultClasses from './carousel.css';
-import { transparentPlaceholder } from '../../shared/images';
 import Icon from '../Icon';
 import Image from '../Image';
-import Button from '../Button';
+import defaultClasses from './carousel.css';
+import Thumbnail from './thumbnail';
 
-const DEFAULT_IMAGE_WIDTH = 640;
-const DEFAULT_IMAGE_HEIGHT = 800;
+const IMAGE_WIDTH = 640;
 
-const Carousel = props => {
-    const classes = mergeClasses(defaultClasses, props.classes);
+/**
+ * Carousel component for product images
+ * Carousel - Component that holds number of images
+ * where typically one image visible, and other
+ * images can be navigated through previous and next buttons
+ *
+ * @typedef ProductImageCarousel
+ * @kind functional component
+ *
+ * @param {props} props
+ *
+ * @returns {React.Element} React carousel component that displays a product image
+ */
+const ProductImageCarousel = props => {
+    const { images } = props;
 
-    const [carouselState, carouselApi] = useCarousel(props.images);
-    const { activeItemIndex, sortedImages } = carouselState;
-    const { handlePrevious, handleNext, setActiveItemIndex } = carouselApi;
+    const talonProps = useProductImageCarousel({
+        images,
+        imageWidth: IMAGE_WIDTH
+    });
 
-    const handleThumbnailClick = useCallback(
-        index => {
-            setActiveItemIndex(index);
-        },
-        [setActiveItemIndex]
-    );
+    const {
+        currentImage,
+        activeItemIndex,
+        altText,
+        handleNext,
+        handlePrevious,
+        handleThumbnailClick,
+        sortedImages
+    } = talonProps;
 
-    const currentImage = sortedImages[activeItemIndex] || {};
-
-    const src = currentImage.file
-        ? resourceUrl(currentImage.file, {
-              type: 'image-product',
-              width: DEFAULT_IMAGE_WIDTH,
-              height: DEFAULT_IMAGE_HEIGHT
-          })
-        : transparentPlaceholder;
-
-    const alt = currentImage.label || 'image-product';
-
+    // create thumbnail image component for every images in sorted order
     const thumbnails = useMemo(
         () =>
             sortedImages.map((item, index) => (
@@ -57,42 +62,76 @@ const Carousel = props => {
         [activeItemIndex, handleThumbnailClick, sortedImages]
     );
 
+    const classes = mergeClasses(defaultClasses, props.classes);
+
+    let image;
+    if (currentImage.file) {
+        image = (
+            <Image
+                alt={altText}
+                classes={{
+                    image: classes.currentImage,
+                    root: classes.imageContainer
+                }}
+                resource={currentImage.file}
+                width={IMAGE_WIDTH}
+            />
+        );
+    } else {
+        image = (
+            <Image
+                alt={altText}
+                classes={{
+                    image: classes.currentImage_placeholder,
+                    root: classes.imageContainer
+                }}
+                src={transparentPlaceholder}
+            />
+        );
+    }
+
     return (
         <div className={classes.root}>
-            <div className={classes.imageContainer}>
-                <Button
-                    classes={{
-                        root_normalPriority: classes.previousButton
-                    }}
+            <div className={classes.carouselContainer}>
+                <button
+                    className={classes.previousButton}
                     onClick={handlePrevious}
                 >
                     <Icon src={ChevronLeftIcon} size={40} />
-                </Button>
-                <Image
-                    classes={{ root: classes.currentImage }}
-                    src={src}
-                    alt={alt}
-                    placeholder={transparentPlaceholder}
-                    fileSrc={currentImage.file}
-                    sizes={`${DEFAULT_IMAGE_WIDTH}px`}
-                />
-                <Button
-                    classes={{
-                        root_normalPriority: classes.nextButton
-                    }}
-                    onClick={handleNext}
-                >
+                </button>
+                {image}
+                <button className={classes.nextButton} onClick={handleNext}>
                     <Icon src={ChevronRightIcon} size={40} />
-                </Button>
+                </button>
             </div>
             <div className={classes.thumbnailList}>{thumbnails}</div>
         </div>
     );
 };
 
-Carousel.propTypes = {
+/**
+ * Props for {@link ProductImageCarousel}
+ *
+ * @typedef props
+ *
+ * @property {Object} classes An object containing the class names for the
+ * ProductImageCarousel component
+ * @property {string} classes.currentImage classes for visible image
+ * @property {string} classes.imageContainer classes for image container
+ * @property {string} classes.nextButton classes for next button
+ * @property {string} classes.previousButton classes for previous button
+ * @property {string} classes.root classes for root container
+ * @property {Object[]} images Product images input for Carousel
+ * @property {string} images.label label for image
+ * @property {string} image.position Position of image in Carousel
+ * @property {bool} image.disabled Is image disabled
+ * @property {string} image.file filePath of image
+ */
+ProductImageCarousel.propTypes = {
     classes: shape({
+        carouselContainer: string,
         currentImage: string,
+        currentImage_placeholder: string,
         imageContainer: string,
         nextButton: string,
         previousButton: string,
@@ -108,4 +147,4 @@ Carousel.propTypes = {
     ).isRequired
 };
 
-export default Carousel;
+export default ProductImageCarousel;

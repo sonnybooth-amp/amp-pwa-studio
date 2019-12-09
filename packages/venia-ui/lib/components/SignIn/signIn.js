@@ -1,5 +1,5 @@
-import React, { useCallback, useRef } from 'react';
-import { bool, func, shape, string } from 'prop-types';
+import React from 'react';
+import { func, shape, string } from 'prop-types';
 import { Form } from 'informed';
 
 import { mergeClasses } from '../../classify';
@@ -7,60 +7,41 @@ import Button from '../Button';
 import Field from '../Field';
 import LoadingIndicator from '../LoadingIndicator';
 import TextInput from '../TextInput';
-import { isRequired } from '../../util/formValidators';
+import { isRequired, validateEmail } from '../../util/formValidators';
+import combine from '../../util/combineValidators';
 
 import defaultClasses from './signIn.css';
-
-// Note: we can't access the actual message that comes back from the server
-// without doing some fragile string manipulation. Hardcoded for now.
-const ERROR_MESSAGE =
-    'The account sign-in was incorrect or your account is disabled temporarily. Please wait and try again later.';
+import { useSignIn } from '@magento/peregrine/lib/talons/SignIn/useSignIn';
+import SIGN_IN_MUTATION from '../../queries/signIn.graphql';
 
 const SignIn = props => {
-    const {
-        isGettingDetails,
-        isSigningIn,
+    const classes = mergeClasses(defaultClasses, props.classes);
+    const { setDefaultUsername, showCreateAccount, showForgotPassword } = props;
+
+    const talonProps = useSignIn({
+        query: SIGN_IN_MUTATION,
         setDefaultUsername,
         showCreateAccount,
-        showForgotPassword,
-        signIn,
-        signInError
-    } = props;
+        showForgotPassword
+    });
 
-    const formRef = useRef(null);
-    const classes = mergeClasses(defaultClasses, props.classes);
-    const hasError = signInError && Object.keys(signInError).length;
-    const errorMessage = hasError ? ERROR_MESSAGE : null;
+    const {
+        errors,
+        formRef,
+        handleCreateAccount,
+        handleForgotPassword,
+        handleSubmit,
+        isBusy
+    } = talonProps;
 
-    const handleSubmit = useCallback(
-        ({ email: username, password }) => {
-            signIn({ username, password });
-        },
-        [signIn]
-    );
+    // Map over any errors we get and display an appropriate error.
+    const errorMessage = errors.length
+        ? errors
+              .map(({ message }) => message)
+              .reduce((acc, msg) => msg + '\n' + acc, '')
+        : null;
 
-    const handleForgotPassword = useCallback(() => {
-        const { current: form } = formRef;
-
-        if (form) {
-            setDefaultUsername(form.formApi.getValue('email'));
-        }
-
-        showForgotPassword();
-    }, [setDefaultUsername, showForgotPassword]);
-
-    const handleCreateAccount = useCallback(() => {
-        const { current: form } = formRef;
-
-        if (form) {
-            setDefaultUsername(form.formApi.getValue('email'));
-        }
-
-        showCreateAccount();
-    }, [setDefaultUsername, showCreateAccount]);
-
-    // if a request is in progress, avoid rendering the form
-    if (isGettingDetails || isSigningIn) {
+    if (isBusy) {
         return (
             <div className={classes.modal_active}>
                 <LoadingIndicator>{'Signing In'}</LoadingIndicator>
@@ -79,7 +60,7 @@ const SignIn = props => {
                     <TextInput
                         autoComplete="email"
                         field="email"
-                        validate={isRequired}
+                        validate={combine([isRequired, validateEmail])}
                     />
                 </Field>
                 <Field label="Password" required={true}>
@@ -102,6 +83,9 @@ const SignIn = props => {
                     priority="low"
                     type="button"
                     onClick={handleForgotPassword}
+                    classes={{
+                        root_lowPriority: classes.forgotPasswordButtonRoot
+                    }}
                 >
                     {'Forgot Password?'}
                 </Button>
@@ -127,16 +111,13 @@ SignIn.propTypes = {
         createAccountButton: string,
         form: string,
         forgotPasswordButton: string,
+        forgotPasswordButtonRoot: string,
         root: string,
         signInButton: string,
         signInDivider: string,
         signInError: string
     }),
-    isGettingDetails: bool,
-    isSigningIn: bool,
     setDefaultUsername: func.isRequired,
     showCreateAccount: func.isRequired,
-    showForgotPassword: func.isRequired,
-    signIn: func.isRequired,
-    signInError: shape({})
+    showForgotPassword: func.isRequired
 };

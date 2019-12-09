@@ -32,16 +32,8 @@
     padding: 0 1rem;
 }
 
-.navTrigger,
-.cartTrigger {
-    composes: root from '../clickable.css';
-    height: 3rem;
-    width: 3rem;
-}
-
 .logo {
     grid-area: title;
-    width: 3rem;
 }
 
 .primaryActions {
@@ -78,8 +70,8 @@
     border-radius: 50%;
     width: var(--dot-size);
     height: var(--dot-size);
-    animation-fill-mode: both;
     animation: pulse 1.8s infinite ease-in-out;
+    animation-fill-mode: both;
 }
 
 .loader {

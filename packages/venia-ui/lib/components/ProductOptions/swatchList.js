@@ -1,22 +1,45 @@
-import React, { Component } from 'react';
-import { arrayOf, object, shape, string } from 'prop-types';
-import { List } from '@magento/peregrine';
-
-import classify from '../../classify';
+import React, { useMemo } from 'react';
+import { arrayOf, func, object, shape, string } from 'prop-types';
 import Swatch from './swatch';
+
+import { mergeClasses } from '../../classify';
 import defaultClasses from './swatchList.css';
 
-class SwatchList extends Component {
-    static propTypes = {
-        classes: shape({
-            root: string
-        }),
-        items: arrayOf(object)
-    };
+const SwatchList = props => {
+    const { getItemKey, selectedValue = {}, items, onSelectionChange } = props;
 
-    render() {
-        return <List renderItem={Swatch} {...this.props} />;
-    }
-}
+    const classes = mergeClasses(defaultClasses, props.classes);
 
-export default classify(defaultClasses)(SwatchList);
+    const swatches = useMemo(
+        () =>
+            items.map(item => {
+                const isSelected = item.label === selectedValue.label;
+
+                return (
+                    <Swatch
+                        key={getItemKey(item)}
+                        isSelected={isSelected}
+                        item={item}
+                        onClick={onSelectionChange}
+                    />
+                );
+            }),
+        [getItemKey, selectedValue.label, items, onSelectionChange]
+    );
+
+    return <div className={classes.root}>{swatches}</div>;
+};
+
+SwatchList.propTypes = {
+    classes: shape({
+        root: string
+    }),
+    getItemKey: func,
+    selectedValue: object,
+    items: arrayOf(object),
+    onSelectionChange: func
+};
+
+SwatchList.displayName = 'SwatchList';
+
+export default SwatchList;

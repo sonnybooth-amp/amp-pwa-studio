@@ -4,8 +4,38 @@ import { Form } from 'informed';
 import { createTestInstance } from '@magento/peregrine';
 
 import CreateAccount from '../createAccount';
+import { useMutation } from '@apollo/react-hooks';
 
+jest.mock('@apollo/react-hooks', () => ({
+    useMutation: jest.fn().mockImplementation(() => [
+        jest.fn(),
+        {
+            error: null
+        }
+    ])
+}));
 jest.mock('../../../util/formValidators');
+jest.mock('@magento/peregrine/lib/context/user', () => {
+    const userState = {
+        isGettingDetails: false,
+        isSignedIn: false
+    };
+    const userApi = {
+        getUserDetails: jest.fn(),
+        setToken: jest.fn()
+    };
+    const useUserContext = jest.fn(() => [userState, userApi]);
+
+    return { useUserContext };
+});
+
+jest.mock('@magento/peregrine/lib/context/cart', () => {
+    const state = {};
+    const api = { getCartDetails: jest.fn(), removeCart: jest.fn() };
+    const useCartContext = jest.fn(() => [state, api]);
+
+    return { useCartContext };
+});
 
 const props = {
     onSubmit: jest.fn()
@@ -17,36 +47,41 @@ test('renders the correct tree', () => {
     expect(tree).toMatchSnapshot();
 });
 
-test('has a submit handler', () => {
-    const { root } = createTestInstance(<CreateAccount {...props} />);
-
-    const { instance } = root.children[0];
-
-    expect(instance.handleSubmit).toBeInstanceOf(Function);
-});
-
 test('attaches the submit handler', () => {
     const { root } = createTestInstance(<CreateAccount {...props} />);
 
-    const { instance } = root.children[0];
     const { onSubmit } = root.findByType(Form).props;
 
-    expect(onSubmit).toBe(instance.handleSubmit);
+    expect(typeof onSubmit).toBe('function');
 });
 
 test('calls onSubmit if validation passes', async () => {
+    useMutation.mockImplementationOnce(() => [
+        jest.fn(),
+        {
+            called: true,
+            loading: false,
+            error: null,
+            data: {}
+        }
+    ]);
+
     const { root } = createTestInstance(<CreateAccount {...props} />);
 
     const form = root.findByType(Form);
-    const { formApi } = form.instance;
-
-    // touch fields, call validators, call onSubmit
-    await act(() => {
-        formApi.submitForm();
+    const { controller } = form.instance;
+    await act(async () => {
+        await form.props.onSubmit({
+            customer: {
+                email: 'test@example.com',
+                firstname: 'tester',
+                lastname: 'guy'
+            },
+            password: 'foo'
+        });
+        expect(props.onSubmit).toHaveBeenCalledTimes(1);
     });
-
-    const { errors } = root.findByType(Form).instance.controller.state;
+    const { errors } = controller.state;
 
     expect(Object.keys(errors)).toHaveLength(0);
-    expect(props.onSubmit).toHaveBeenCalledTimes(1);
 });

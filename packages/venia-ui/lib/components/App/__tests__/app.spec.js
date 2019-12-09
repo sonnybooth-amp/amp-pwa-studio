@@ -1,10 +1,12 @@
 import React from 'react';
 import { createTestInstance } from '@magento/peregrine';
+import { useAppContext } from '@magento/peregrine/lib/context/app';
 
 import Main from '../../Main';
 import Mask from '../../Mask';
 import MiniCart from '../../MiniCart';
 import Navigation from '../../Navigation';
+import Routes from '../../Routes';
 
 jest.mock('../../Head', () => ({
     HeadProvider: ({ children }) => <div>{children}</div>,
@@ -13,6 +15,7 @@ jest.mock('../../Head', () => ({
 jest.mock('../../Main', () => 'Main');
 jest.mock('../../MiniCart', () => 'MiniCart');
 jest.mock('../../Navigation', () => 'Navigation');
+jest.mock('../../Routes', () => 'Routes');
 jest.mock('../../ToastContainer', () => 'ToastContainer');
 
 Object.defineProperty(window.location, 'reload', {
@@ -32,7 +35,22 @@ jest.mock('@magento/peregrine', () => {
     };
 });
 
-jest.mock('../../../util/createErrorRecord', () => ({
+jest.mock('@magento/peregrine/lib/context/app', () => {
+    const state = {
+        hasBeenOffline: false,
+        isOnline: true,
+        overlay: false,
+        drawer: null
+    };
+    const api = {
+        closeDrawer: jest.fn()
+    };
+    const useAppContext = jest.fn(() => [state, api]);
+
+    return { useAppContext };
+});
+
+jest.mock('@magento/peregrine/lib/util/createErrorRecord', () => ({
     __esModule: true,
     default: jest.fn().mockReturnValue({
         error: { message: 'A render error', stack: 'errorStack' },
@@ -42,13 +60,6 @@ jest.mock('../../../util/createErrorRecord', () => ({
 }));
 
 window.location.reload = jest.fn();
-
-class Routes extends React.Component {
-    render() {
-        return null;
-    }
-}
-jest.doMock('../renderRoutes', () => () => <Routes />);
 
 // require app after mock is complete
 const App = require('../app').default;
@@ -66,34 +77,45 @@ beforeAll(() => {
 afterAll(() => window.location.reload.mockRestore());
 
 test('renders a full page with onlineIndicator and routes', () => {
-    const appProps = {
-        app: {
+    const [appState, appApi] = useAppContext();
+    const mockedReturnValue = [
+        {
+            ...appState,
             drawer: '',
             overlay: false,
             hasBeenOffline: true,
             isOnline: false
         },
-        closeDrawer: jest.fn(),
+        appApi
+    ];
+
+    useAppContext.mockReturnValueOnce(mockedReturnValue);
+
+    const appProps = {
         markErrorHandled: jest.fn(),
         unhandledErrors: []
     };
     const { root } = createTestInstance(<App {...appProps} />);
 
     getAndConfirmProps(root, Navigation);
-    getAndConfirmProps(root, MiniCart, { isOpen: false });
+    getAndConfirmProps(root, MiniCart);
 
     const main = getAndConfirmProps(root, Main, {
         isMasked: false
     });
 
-    // hasBeenOffline means onlineIndicator
-    getAndConfirmProps(root, Main, { isOnline: false });
+    expect(mockAddToast).toHaveBeenCalledWith({
+        type: 'error',
+        icon: expect.any(Object),
+        message: 'You are offline. Some features may be unavailable.',
+        timeout: 3000
+    });
     // renderRoutes should just return a fake component here
     expect(main.findByType(Routes)).toBeTruthy();
 
     const mask = getAndConfirmProps(root, Mask, {
         isActive: false,
-        dismiss: appProps.closeDrawer
+        dismiss: expect.any(Function)
     });
 
     // appropriate positioning
@@ -104,47 +126,69 @@ test('renders a full page with onlineIndicator and routes', () => {
 });
 
 test('displays onlineIndicator online if hasBeenOffline', () => {
-    const appProps = {
-        app: {
+    const [appState, appApi] = useAppContext();
+    const mockedReturnValue = [
+        {
+            ...appState,
             drawer: '',
             overlay: false,
             hasBeenOffline: true,
             isOnline: true
         },
-        closeDrawer: jest.fn(),
+        appApi
+    ];
+
+    useAppContext.mockReturnValueOnce(mockedReturnValue);
+
+    const appProps = {
         markErrorHandled: jest.fn(),
         unhandledErrors: []
     };
 
-    const { root } = createTestInstance(<App {...appProps} />);
-    // hasBeenOffline means onlineIndicator
-    getAndConfirmProps(root, Main, { isOnline: true });
+    createTestInstance(<App {...appProps} />);
+    expect(mockAddToast).toHaveBeenCalledWith({
+        type: 'info',
+        icon: expect.any(Object),
+        message: 'You are online.',
+        timeout: 3000
+    });
 });
 
 test('displays open nav or drawer', () => {
-    const propsWithDrawer = drawer => ({
-        app: {
-            drawer,
-            overlay: false,
-            hasBeenOffline: false,
-            isOnline: false
-        },
-        closeDrawer: jest.fn(),
+    const [appState, appApi] = useAppContext();
+    useAppContext
+        .mockReturnValueOnce([
+            {
+                ...appState,
+                drawer: 'nav',
+                overlay: false,
+                hasBeenOffline: true,
+                isOnline: true
+            },
+            appApi
+        ])
+        .mockReturnValueOnce([
+            {
+                ...appState,
+                drawer: 'cart',
+                overlay: false,
+                hasBeenOffline: true,
+                isOnline: true
+            },
+            appApi
+        ]);
+    const props = {
         markErrorHandled: jest.fn(),
         unhandledErrors: []
-    });
+    };
 
-    const { root: openNav } = createTestInstance(
-        <App {...propsWithDrawer('nav')} />
-    );
+    const { root: openNav } = createTestInstance(<App {...props} />);
 
     getAndConfirmProps(openNav, Navigation);
 
-    const { root: openCart } = createTestInstance(
-        <App {...propsWithDrawer('cart')} />
-    );
+    const { root: openCart } = createTestInstance(<App {...props} />);
 
-    getAndConfirmProps(openCart, MiniCart, { isOpen: true });
+    getAndConfirmProps(openCart, MiniCart);
 });
 
 test('renders with renderErrors', () => {
@@ -252,4 +296,27 @@ test('adds toasts for unhandled errors', () => {
         timeout: expect.any(Number),
         type: 'error'
     });
+});
+
+test('displays update available message when a HTML_UPDATE_AVAILABLE message is received', () => {
+    const appProps = {
+        markErrorHandled: jest.fn(),
+        unhandledErrors: []
+    };
+
+    createTestInstance(<App {...appProps} />);
+
+    window.postMessage('HTML_UPDATE_AVAILABLE', '*');
+
+    setTimeout(() => {
+        expect(mockAddToast).toHaveBeenCalledWith({
+            type: 'warning',
+            icon: expect.any(Object),
+            message: 'Update available. Please refresh.',
+            actionText: 'Refresh',
+            timeout: 0,
+            onAction: expect.any(Function),
+            onDismiss: expect.any(Function)
+        });
+    }, 1000);
 });

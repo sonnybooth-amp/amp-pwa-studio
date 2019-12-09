@@ -1,80 +1,71 @@
-import React, { Component } from 'react';
+import React, { useMemo } from 'react';
 import { arrayOf, string, shape } from 'prop-types';
-import classify from '../../classify';
-import { Link, resourceUrl } from '@magento/venia-drivers';
+
+import { Link } from '@magento/venia-drivers';
+import { useCategoryTile } from '@magento/peregrine/lib/talons/CategoryList/useCategoryTile';
+
+import { mergeClasses } from '../../classify';
+import Image from '../Image';
 import defaultClasses from './categoryTile.css';
 
-// TODO: get categoryUrlSuffix from graphql storeOptions when it is ready
-const categoryUrlSuffix = '.html';
+const IMAGE_WIDTH = 80;
 
-const previewImageSize = 480;
+const CategoryTile = props => {
+    const talonProps = useCategoryTile({
+        item: props.item
+    });
 
-class CategoryTile extends Component {
-    static propTypes = {
-        item: shape({
-            image: string,
-            name: string.isRequired,
-            productImagePreview: shape({
-                items: arrayOf(
-                    shape({
-                        small_image: string
-                    })
-                )
-            }),
-            url_key: string.isRequired
-        }).isRequired,
-        classes: shape({
-            item: string,
-            image: string,
-            imageWrapper: string,
-            name: string
-        }).isRequired
-    };
+    const { image, item } = talonProps;
 
-    get imagePath() {
-        const { image, productImagePreview } = this.props.item;
-        const previewProduct = productImagePreview.items[0];
-        if (image) {
-            return resourceUrl(image, {
-                type: 'image-category',
-                width: previewImageSize
-            });
-        } else if (previewProduct) {
-            return resourceUrl(previewProduct.small_image, {
-                type: 'image-product',
-                width: previewImageSize
-            });
-        } else {
-            return null;
-        }
-    }
+    const classes = mergeClasses(defaultClasses, props.classes);
 
-    render() {
-        const { imagePath, props } = this;
-        const { classes, item } = props;
-
-        // interpolation doesn't work inside `url()` for legacy reasons
-        // so a custom property should wrap its value in `url()`
-        const imageUrl = imagePath ? `url(${imagePath})` : 'none';
-        const style = { '--venia-image': imageUrl };
-
-        // render an actual image element for accessibility
-        const imagePreview = imagePath ? (
-            <img className={classes.image} src={imagePath} alt={item.name} />
-        ) : null;
-
-        return (
-            <Link
-                className={classes.root}
-                to={`/${item.url_key}${categoryUrlSuffix}`}
-            >
-                <span className={classes.imageWrapper} style={style}>
-                    {imagePreview}
-                </span>
-                <span className={classes.name}>{item.name}</span>
-            </Link>
+    const imagePreview = useMemo(() => {
+        return image.url ? (
+            <Image
+                alt={item.name}
+                classes={{ image: classes.image, root: classes.imageContainer }}
+                resource={image.url}
+                type={image.type}
+                width={IMAGE_WIDTH}
+            />
+        ) : (
+            <span className={classes.image_empty} />
         );
-    }
-}
+    }, [
+        classes.image,
+        classes.image_empty,
+        classes.imageContainer,
+        image.type,
+        image.url,
+        item.name
+    ]);
 
-export default classify(defaultClasses)(CategoryTile);
+    return (
+        <Link className={classes.root} to={item.url}>
+            {imagePreview}
+            <span className={classes.name}>{item.name}</span>
+        </Link>
+    );
+};
+
+CategoryTile.propTypes = {
+    item: shape({
+        image: string,
+        name: string.isRequired,
+        productImagePreview: shape({
+            items: arrayOf(
+                shape({
+                    small_image: string
+                })
+            )
+        }),
+        url_key: string.isRequired
+    }).isRequired,
+    classes: shape({
+        item: string,
+        image: string,
+        imageContainer: string,
+        name: string
+    })
+};
+export default CategoryTile;

@@ -24,7 +24,14 @@ const mockEnv = prod =>
     loadEnvironment.mockReturnValueOnce({
         env: process.env,
         sections: jest.fn(),
-        section: jest.fn(),
+        section: jest.fn(
+            key =>
+                ({
+                    devServer: {
+                        serviceWorkerEnabled: !!prod
+                    }
+                }[key])
+        ),
         isProd: prod
     });
 
@@ -39,10 +46,6 @@ const simulate = {
     },
     statsAsMissing() {
         mockStat(false, false, new Error());
-        return this;
-    },
-    productionEnvironment() {
-        mockEnv(true);
         return this;
     },
     productionEnvironment() {
@@ -71,7 +74,7 @@ test('produces a webpack config and friendly manifest plugin', async () => {
         .statsAsDirectory()
         .statsAsFile()
         .productionEnvironment();
-    const config = await configureWebpack({ context: '.' });
+    const { clientConfig: config } = await configureWebpack({ context: '.' });
     expect(config).toMatchObject({
         context: '.',
         mode: 'production',
@@ -119,9 +122,12 @@ test('works in developer mode from cli', async () => {
         .statsAsDirectory()
         .statsAsMissing()
         .productionEnvironment();
-    await expect(
-        configureWebpack({ context: '.', env: { mode: 'development' } })
-    ).resolves.toHaveProperty('mode', 'development');
+    const { clientConfig } = await configureWebpack({
+        context: '.',
+        env: { mode: 'development' }
+    });
+
+    expect(clientConfig).toHaveProperty('mode', 'development');
 });
 
 test('works in developer mode from fallback', async () => {
@@ -129,10 +135,9 @@ test('works in developer mode from fallback', async () => {
         .statsAsDirectory()
         .statsAsMissing()
         .devEnvironment();
-    await expect(configureWebpack({ context: '.' })).resolves.toHaveProperty(
-        'mode',
-        'development'
-    );
+    const { clientConfig } = await configureWebpack({ context: '.' });
+
+    expect(clientConfig).toHaveProperty('mode', 'development');
 });
 
 test('errors when mode unrecognized', async () => {
@@ -145,13 +150,25 @@ test('errors when mode unrecognized', async () => {
     ).rejects.toThrowError('wuh');
 });
 
+test('errors when environment is invalid', async () => {
+    simulate.statsAsDirectory().statsAsMissing();
+    loadEnvironment.mockReturnValueOnce({
+        env: process.env,
+        envFilePresent: false,
+        error: new Error('Configuration foo was invalid')
+    });
+    await expect(
+        configureWebpack({ context: '.', env: { mode: 'development' } })
+    ).rejects.toThrowError('foo was invalid');
+});
+
 test('handles special flags', async () => {
     simulate
         .statsAsDirectory()
         .statsAsFile()
         .productionEnvironment();
 
-    const config = await configureWebpack({
+    const { clientConfig } = await configureWebpack({
         context: '.',
         vendor: ['jest'],
         special: {
@@ -172,7 +189,7 @@ test('handles special flags', async () => {
         }
     });
     expect(
-        config.module.rules.find(({ use }) =>
+        clientConfig.module.rules.find(({ use }) =>
             use.some(({ loader }) => /^graphql\-tag/.test(loader))
         ).include
     ).toHaveLength(3);

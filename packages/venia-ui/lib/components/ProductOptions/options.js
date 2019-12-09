@@ -1,42 +1,34 @@
-import React, { Component } from 'react';
-import { func, object } from 'prop-types';
-
-import isProductConfigurable from '../../util/isProductConfigurable';
+import React from 'react';
+import { array, func } from 'prop-types';
 
 import Option from './option';
+import { useOptions } from '@magento/peregrine/lib/talons/ProductOptions/useOptions';
 
-class Options extends Component {
-    static propTypes = {
-        onSelectionChange: func,
-        product: object
-    };
+const Options = props => {
+    const { onSelectionChange, options, selectedValues = [] } = props;
 
-    handleSelectionChange = (optionId, selection) => {
-        const { onSelectionChange } = this.props;
+    const talonProps = useOptions({
+        onSelectionChange,
+        selectedValues
+    });
 
-        if (onSelectionChange) {
-            onSelectionChange(optionId, selection);
-        }
-    };
+    const { handleSelectionChange, selectedValueMap } = talonProps;
 
-    render() {
-        const { handleSelectionChange, props } = this;
-        const { product } = props;
+    // Render a list of options passing in any pre-selected values.
+    return options.map(option => (
+        <Option
+            {...option}
+            key={option.attribute_id}
+            onSelectionChange={handleSelectionChange}
+            selectedValue={selectedValueMap.get(option.label)}
+        />
+    ));
+};
 
-        if (!isProductConfigurable(product)) {
-            // Non-configurable products don't have options.
-            return null;
-        }
-
-        const { configurable_options } = product;
-        return configurable_options.map(option => (
-            <Option
-                {...option}
-                key={option.attribute_id}
-                onSelectionChange={handleSelectionChange}
-            />
-        ));
-    }
-}
+Options.propTypes = {
+    onSelectionChange: func,
+    options: array.isRequired,
+    selectedValues: array
+};
 
 export default Options;

@@ -1,62 +1,93 @@
-import React, { Component } from 'react';
-import { arrayOf, func, object, shape, string } from 'prop-types';
+import React, { useMemo } from 'react';
+import {
+    arrayOf,
+    func,
+    number,
+    object,
+    oneOfType,
+    shape,
+    string
+} from 'prop-types';
 
-import classify from '../../classify';
+import { mergeClasses } from '../../classify';
 import getOptionType from './getOptionType';
 import SwatchList from './swatchList';
 import TileList from './tileList';
 import defaultClasses from './option.css';
+import { useOption } from '@magento/peregrine/lib/talons/ProductOptions/useOption';
 
 const getItemKey = ({ value_index }) => value_index;
 
-class Option extends Component {
-    static propTypes = {
-        attribute_id: string,
-        attribute_code: string.isRequired,
-        classes: shape({
-            root: string,
-            title: string
-        }),
-        label: string.isRequired,
-        onSelectionChange: func,
-        values: arrayOf(object).isRequired
-    };
+// TODO: get an explicit field from the API
+// that identifies an attribute as a swatch
+const getListComponent = (attribute_code, values) => {
+    const optionType = getOptionType({ attribute_code, values });
 
-    handleSelectionChange = selection => {
-        const { attribute_id, onSelectionChange } = this.props;
+    return optionType === 'swatch' ? SwatchList : TileList;
+};
 
-        if (onSelectionChange) {
-            onSelectionChange(attribute_id, selection);
-        }
-    };
+const Option = props => {
+    const {
+        attribute_code,
+        attribute_id,
+        label,
+        onSelectionChange,
+        selectedValue,
+        values
+    } = props;
 
-    get listComponent() {
-        const { attribute_code, values } = this.props;
+    const talonProps = useOption({
+        attribute_id,
+        label,
+        onSelectionChange,
+        selectedValue,
+        values
+    });
 
-        // TODO: get an explicit field from the API
-        // that identifies an attribute as a swatch
-        const optionType = getOptionType({ attribute_code, values });
+    const {
+        handleSelectionChange,
+        initialSelection,
+        selectedValueLabel,
+        selectedValueDescription
+    } = talonProps;
 
-        return optionType === 'swatch' ? SwatchList : TileList;
-    }
+    const ValueList = useMemo(() => getListComponent(attribute_code, values), [
+        attribute_code,
+        values
+    ]);
 
-    render() {
-        const { handleSelectionChange, listComponent: ValueList, props } = this;
-        const { classes, label, values } = props;
+    const classes = mergeClasses(defaultClasses, props.classes);
 
-        return (
-            <div className={classes.root}>
-                <h3 className={classes.title}>
-                    <span>{label}</span>
-                </h3>
-                <ValueList
-                    getItemKey={getItemKey}
-                    items={values}
-                    onSelectionChange={handleSelectionChange}
-                />
-            </div>
-        );
-    }
-}
+    return (
+        <div className={classes.root}>
+            <h3 className={classes.title}>
+                <span>{label}</span>
+            </h3>
+            <ValueList
+                getItemKey={getItemKey}
+                selectedValue={initialSelection}
+                items={values}
+                onSelectionChange={handleSelectionChange}
+            />
+            <dl className={classes.selection}>
+                <dt className={classes.selectionLabel}>{selectedValueLabel}</dt>
+                <dd>{selectedValueDescription}</dd>
+            </dl>
+        </div>
+    );
+};
 
-export default classify(defaultClasses)(Option);
+Option.propTypes = {
+    attribute_code: string.isRequired,
+    attribute_id: string,
+    classes: shape({
+        root: string,
+        title: string
+    }),
+    label: string.isRequired,
+    onSelectionChange: func,
+    selectedValue: oneOfType([number, string]),
+    values: arrayOf(object).isRequired
+};
+
+export default Option;

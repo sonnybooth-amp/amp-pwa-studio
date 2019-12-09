@@ -1,40 +1,31 @@
-import React, { Component } from 'react';
-import PropTypes from 'prop-types';
-import { withRouter } from '@magento/venia-drivers';
-import { compose } from 'redux';
+import React from 'react';
+import { shape, string } from 'prop-types';
+import { useCreateAccountPage } from '@magento/peregrine/lib/talons/CreateAccountPage/useCreateAccountPage';
+
 import CreateAccountForm from '../CreateAccount';
-import classify from '../../classify';
+import { mergeClasses } from '../../classify';
 import defaultClasses from './createAccountPage.css';
-import { getCreateAccountInitialValues } from './helpers';
 
-class CreateAccountPage extends Component {
-    static propTypes = {
-        createAccount: PropTypes.func,
-        initialValues: PropTypes.shape({}),
-        history: PropTypes.shape({})
-    };
+const CreateAccountPage = props => {
+    const talonProps = useCreateAccountPage();
+    const { initialValues, handleCreateAccount } = talonProps;
+    const classes = mergeClasses(defaultClasses, props.classes);
 
-    createAccount = accountInfo => {
-        const { createAccount, history } = this.props;
-        createAccount({ accountInfo, history });
-    };
+    return (
+        <div className={classes.container}>
+            <CreateAccountForm
+                initialValues={initialValues}
+                onSubmit={handleCreateAccount}
+            />
+        </div>
+    );
+};
 
-    render() {
-        const initialValues = getCreateAccountInitialValues(
-            window.location.search
-        );
-        return (
-            <div className={this.props.classes.container}>
-                <CreateAccountForm
-                    initialValues={initialValues}
-                    onSubmit={this.createAccount}
-                />
-            </div>
-        );
-    }
-}
+CreateAccountPage.propTypes = {
+    classes: shape({
+        container: string
+    }),
+    initialValues: shape({})
+};
 
-export default compose(
-    withRouter,
-    classify(defaultClasses)
-)(CreateAccountPage);
+export default CreateAccountPage;
