@@ -12,6 +12,8 @@ import { useHeader } from '@magento/peregrine/lib/talons/Header/useHeader';
 
 import { mergeClasses } from '../../classify';
 import defaultClasses from './header.css';
+import ampClasses from '@ampersandhq/amp-css/dist/css/amp.css';
+
 
 const SearchBar = React.lazy(() => import('../SearchBar'));
 
@@ -23,7 +25,7 @@ const Header = props => {
         searchOpen
     } = useHeader();
 
-    const classes = mergeClasses(defaultClasses, props.classes);
+    const classes = mergeClasses(defaultClasses, ampClasses, props.classes);
     const rootClass = searchOpen ? classes.open : classes.closed;
     const searchBarFallback = (
         <div className={classes.searchFallback}>

@@ -6,7 +6,7 @@ import Footer from './footer';
 import Header from './header';
 import Mask from './mask';
 import defaultClasses from './miniCart.css';
-
+import CREATE_CART_MUTATION from '../../queries/createCart.graphql';
 import { mergeClasses } from '../../classify';
 import { useMiniCart } from '@magento/peregrine/lib/talons/MiniCart/useMiniCart';
 
@@ -26,12 +26,13 @@ const MiniCart = props => {
         isOpen,
         isUpdatingItem,
         numItems,
-        removeItemFromCart,
         setStep,
         shouldShowFooter,
         step,
         subtotal
-    } = useMiniCart();
+    } = useMiniCart({
+        createCartMutation: CREATE_CART_MUTATION
+    });
 
     const footer = shouldShowFooter ? (
         <Footer
@@ -60,7 +61,6 @@ const MiniCart = props => {
                 isEditingItem={isEditingItem}
                 isLoading={isLoading}
                 isUpdatingItem={isUpdatingItem}
-                removeItemFromCart={removeItemFromCart}
                 updateItemInCart={handleUpdateItemInCart}
             />
             <Mask isActive={isMiniCartMaskOpen} dismiss={handleDismiss} />

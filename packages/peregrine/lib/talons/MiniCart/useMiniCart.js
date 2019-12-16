@@ -1,16 +1,17 @@
 import { useCallback, useState } from 'react';
+import { useMutation } from '@apollo/react-hooks';
+
 import { useAppContext } from '@magento/peregrine/lib/context/app';
 import { useCartContext } from '@magento/peregrine/lib/context/cart';
 import { useCheckoutContext } from '@magento/peregrine/lib/context/checkout';
 
 import getCurrencyCode from '@magento/peregrine/lib/util/getCurrencyCode';
 
-export const useMiniCart = () => {
+export const useMiniCart = props => {
+    const { createCartMutation } = props;
+    const [fetchCartId] = useMutation(createCartMutation);
     const [{ drawer }, { closeDrawer }] = useAppContext();
-    const [
-        cartState,
-        { updateItemInCart, removeItemFromCart }
-    ] = useCartContext();
+    const [cartState, { updateItemInCart }] = useCartContext();
     const [, { cancelCheckout }] = useCheckoutContext();
     const [step, setStep] = useState('cart');
 
@@ -46,16 +47,19 @@ export const useMiniCart = () => {
     }, []);
 
     const handleUpdateItemInCart = useCallback(
-        async (...args) => {
+        async payload => {
             try {
-                await updateItemInCart(...args);
+                await updateItemInCart({
+                    ...payload,
+                    fetchCartId
+                });
             } catch (error) {
                 console.log('Unable to update item:', error.message);
             } finally {
                 setIsEditingItem(false);
             }
         },
-        [updateItemInCart]
+        [fetchCartId, updateItemInCart]
     );
 
     const handleDismiss = useCallback(() => {
@@ -78,7 +82,6 @@ export const useMiniCart = () => {
         isOpen,
         isUpdatingItem,
         numItems,
-        removeItemFromCart,
         setStep,
         shouldShowFooter,
         step,
